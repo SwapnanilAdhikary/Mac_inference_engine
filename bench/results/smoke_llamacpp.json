@@ -1,0 +1,271 @@
+{
+ "args": {
+  "url": "http://127.0.0.1:8101",
+  "model": "Qwen/Qwen3-0.6B",
+  "endpoint": "completions",
+  "concurrency": "1,2",
+  "num_requests": 4,
+  "workload": "chat",
+  "max_tokens": 32,
+  "tokenizer": "Qwen/Qwen3-1.7B",
+  "seed": 0,
+  "suppress_eos": false,
+  "no_warmup": false,
+  "out": "bench/results/smoke_llamacpp.json"
+ },
+ "time": "2026-11-20T09:42:18",
+ "levels": [
+  {
+   "concurrency": 1,
+   "num_requests": 4,
+   "completed": 4,
+   "failed": 0,
+   "errors": [],
+   "wall_s": 1.4464588330000083,
+   "req_per_s": 2.7653742427662835,
+   "output_tok_per_s": 88.49197576852107,
+   "ttft_ms": {
+    "p50": 45.66712499999426,
+    "p90": 46.67227939997929,
+    "p99": 47.00236573999291,
+    "mean": 43.330062500004374
+   },
+   "itl_ms": {
+    "p50": 10.192083000021057,
+    "p90": 10.632237599986638,
+    "p99": 11.013652679974937,
+    "mean": 10.262203620967622
+   },
+   "tpot_ms": {
+    "p50": 10.24202822580653,
+    "p90": 10.338487351613285,
+    "p99": 10.367990660967621,
+    "mean": 10.265638096774227
+   },
+   "e2e_ms": {
+    "p50": 362.9401035000228,
+    "p90": 367.16538729999115,
+    "p99": 368.41007622998916,
+    "mean": 361.5648435000054
+   },
+   "prompt_tokens_mean": 249.75,
+   "server_prompt_tokens_mean": 249.75,
+   "output_tokens_mean": 32.0,
+   "retokenized_output_tokens_mean": 32.0,
+   "chunks_per_request_mean": 32.0,
+   "usage_reported": 4,
+   "length_mismatches": 0,
+   "finish_reasons": {
+    "length": 4
+   },
+   "requests": [
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 258,
+      "total_tokens": 290,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.3639384159999963,
+     "ttft": 0.04581649999994397,
+     "chunks": 32,
+     "prompt_tokens": 258
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 178,
+      "total_tokens": 210,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.351830791999987,
+     "ttft": 0.034946958000034556,
+     "chunks": 32,
+     "prompt_tokens": 178
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 279,
+      "total_tokens": 311,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.3619417910000493,
+     "ttft": 0.04551775000004454,
+     "chunks": 32,
+     "prompt_tokens": 279
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 284,
+      "total_tokens": 316,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.36854837499998894,
+     "ttft": 0.047039041999994424,
+     "chunks": 32,
+     "prompt_tokens": 284
+    }
+   ]
+  },
+  {
+   "concurrency": 2,
+   "num_requests": 4,
+   "completed": 4,
+   "failed": 0,
+   "errors": [],
+   "wall_s": 0.8490765419999775,
+   "req_per_s": 4.711000483629079,
+   "output_tok_per_s": 150.75201547613054,
+   "ttft_ms": {
+    "p50": 60.790666500025736,
+    "p90": 66.85738380000998,
+    "p99": 66.8671264800065,
+    "mean": 60.77731250000795
+   },
+   "itl_ms": {
+    "p50": 11.656146000007084,
+    "p90": 12.046487500037983,
+    "p99": 13.681300159988147,
+    "mean": 11.729263096773751
+   },
+   "tpot_ms": {
+    "p50": 11.731793677419715,
+    "p90": 11.740243693548512,
+    "p99": 11.740290508064152,
+    "mean": 11.731222443548326
+   },
+   "e2e_ms": {
+    "p50": 424.4588960000044,
+    "p90": 430.24750379999546,
+    "p99": 430.2583372799978,
+    "mean": 424.4452082500061
+   },
+   "prompt_tokens_mean": 190.75,
+   "server_prompt_tokens_mean": 190.75,
+   "output_tokens_mean": 32.0,
+   "retokenized_output_tokens_mean": 32.0,
+   "chunks_per_request_mean": 32.0,
+   "usage_reported": 4,
+   "length_mismatches": 0,
+   "finish_reasons": {
+    "length": 4
+   },
+   "requests": [
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 126,
+      "total_tokens": 158,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.41860350000001745,
+     "ttft": 0.054659707999974216,
+     "chunks": 32,
+     "prompt_tokens": 126
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 228,
+      "total_tokens": 260,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.4186983750000195,
+     "ttft": 0.05474920800003247,
+     "chunks": 32,
+     "prompt_tokens": 228
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 181,
+      "total_tokens": 213,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.4302595409999981,
+     "ttft": 0.066832125000019,
+     "chunks": 32,
+     "prompt_tokens": 181
+    },
+    {
+     "ok": true,
+     "error": null,
+     "max_tokens": 32,
+     "out_tokens": 32,
+     "retok_tokens": 32,
+     "finish_reason": "length",
+     "usage": {
+      "completion_tokens": 32,
+      "prompt_tokens": 228,
+      "total_tokens": 260,
+      "prompt_tokens_details": {
+       "cached_tokens": 0
+      }
+     },
+     "e2e": 0.43021941699998933,
+     "ttft": 0.06686820900000612,
+     "chunks": 32,
+     "prompt_tokens": 228
+    }
+   ]
+  }
+ ]
+}

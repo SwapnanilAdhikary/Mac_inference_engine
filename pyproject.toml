@@ -1,0 +1,20 @@
+[project]
+name = "mie"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "huggingface-hub>=2.4.0",
+    "mlx>=0.32.4",
+    "numpy>=2.5.5",
+    "transformers>=5.23.0",
+]
+
+[dependency-groups]
+dev = [
+    "mlx-lm>=0.32.2",
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
