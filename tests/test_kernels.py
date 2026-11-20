@@ -157,3 +157,12 @@ def test_qlinear(M, N, Kd):
         close(K.qmv(x, p, s, b), ref_out, 0.05, rtol=0.02)
     if K.has_nax():
         close(K.qmm(x, p, s, b), ref_out, 0.05, rtol=0.02)
+
+
+@pytest.mark.skipif(not K.has_nax(), reason="tensor-op kernels need an M5-class GPU")
+@pytest.mark.parametrize("M", [1, 13, 16])
+@pytest.mark.parametrize("N,Kd", [(12288, 2048), (151936, 2048), (3000, 1024)])
+def test_bmm(M, N, Kd):
+    w = (mx.random.normal((N, Kd)) * 0.05).astype(mx.bfloat16)
+    x = mx.random.normal((M, Kd)).astype(mx.bfloat16)
+    close(K.bmm(x, w), x.astype(mx.float32) @ w.astype(mx.float32).T, 0.05)

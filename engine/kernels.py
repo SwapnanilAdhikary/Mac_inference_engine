@@ -164,7 +164,7 @@ _DEC_SRC = """
         for (int j = 0; j < 4; j++) { q[g][j] = float(qs[qb + j]) * scale; acc[g][j] = 0.0f; }
         m[g] = -INFINITY; l[g] = 0.0f;
     }
-    auto bt = block_tables + s * MAXB;
+    auto bt = block_tables + s * block_tables_shape[1];   // runtime: no recompile per width
     for (int k = k0 + int(sg); k < k1; k += SIMDS) {
         uint slot = uint(bt[k / BS]) * BS + uint(k % BS);
         uint kb = (slot * HKV + kvh) * D + lane * 4;
@@ -238,8 +238,8 @@ def paged_decode(q, q_rows, k_cache, v_cache, block_tables, ctx_lens, dep, H, HK
     """q: [T, H, D]; q_rows [S] picks each sequence's query row. Returns [S, H, D].
     part=None: one pass. part=N: split each sequence into N-key partitions + reduce (long contexts)."""
     S, D = q_rows.shape[0], q.shape[-1]
-    MAXB = block_tables.shape[1]
-    tpl = [("H", H), ("HKV", HKV), ("D", D), ("BS", BS), ("MAXB", MAXB), ("SIMDS", simds)]
+    # only values fixed for a model are template params: each new template value is a ~40 ms JIT compile
+    tpl = [("H", H), ("HKV", HKV), ("D", D), ("BS", BS), ("SIMDS", simds)]
     ins = [q, q_rows, k_cache, v_cache, block_tables, ctx_lens, dep]
     if part is None:
         return _dec_kernel(False)(inputs=ins, template=tpl + [("PART", 0)], grid=(simds * 32 * HKV, S, 1),
@@ -267,7 +267,7 @@ _PRE_SRC = """
     uint h = kvh * G + sg / SGH;                           // this simdgroup's q head
     int seq = tiles[tile * 4 + 0], row0 = tiles[tile * 4 + 1], nrows = tiles[tile * 4 + 2], pos0 = tiles[tile * 4 + 3];
     int ctx = ctx_lens[seq];
-    auto bt = block_tables + seq * MAXB;
+    auto bt = block_tables + seq * block_tables_shape[1];
     const float scale = 1.4426950408889634f / sqrt(float(D));   // log2(e) / sqrt(D)
 
     short qid = lane / 4;
@@ -387,7 +387,7 @@ _NAX_SRC = """
     uint h = kvh * G + sg / SGH;
     int seq = tiles[tile * 4 + 0], row0 = tiles[tile * 4 + 1], nrows = tiles[tile * 4 + 2], pos0 = tiles[tile * 4 + 3];
     int ctx = ctx_lens[seq];
-    auto bt = block_tables + seq * MAXB;
+    auto bt = block_tables + seq * block_tables_shape[1];
     const float scale = 1.4426950408889634f / sqrt(float(D));   // log2(e) / sqrt(D), applied to S in fp32
 
     short qid = lane >> 2;
@@ -526,8 +526,7 @@ def paged_prefill(q, tiles, num_tiles, k_cache, v_cache, block_tables, ctx_lens,
     kern, sgh = (_nax_k, NAX_SGH) if nax else (_pre_k, SGH)
     assert (16 if nax else 8) * sgh == BQ
     return kern(inputs=[q, tiles, k_cache, v_cache, block_tables, ctx_lens, dep],
-                template=[("H", H), ("HKV", HKV), ("D", D), ("BS", BS), ("MAXB", block_tables.shape[1]),
-                          ("BK", 32), ("SGH", sgh)],
+                template=[("H", H), ("HKV", HKV), ("D", D), ("BS", BS), ("BK", 32), ("SGH", sgh)],
                 grid=(32 * sgh * G * num_tiles, HKV, 1), threadgroup=(32 * sgh * G, 1, 1),
                 output_shapes=[(T_out, H, D)], output_dtypes=[q.dtype], init_value=0)[0]
 
@@ -620,6 +619,7 @@ _QMM_SRC = """
     // then multiplied on the tensor units (matmul2d 16x32x16, fp32 accumulate). Tile = BM x BN, BM = 16*WM,
     // BN = 32*WN; simdgroup (wm, wn) owns a 16 x 32 output block. Weights are read from DRAM once per M-tile.
     using namespace mpp::tensor_ops;
+    const uint M = x_shape[0];   // runtime: decode batches vary every step
     const uint BM = 16 * WM, BN = 32 * WN, BK = 64;
     ushort lane = thread_index_in_simdgroup;
     uint sg = simdgroup_index_in_threadgroup, tid = thread_position_in_threadgroup.x;
@@ -688,7 +688,7 @@ def qmm(x, packed, scales, biases, wm=None, wn=4):
     N = packed.shape[0]
     wm = wm or (1 if M <= 16 else 2 if M <= 32 else 4)
     BM, BN = 16 * wm, 32 * wn
-    return _qmm_k(inputs=[x, packed, scales, biases], template=[("M", M), ("K", Kd), ("N", N), ("WM", wm), ("WN", wn)],
+    return _qmm_k(inputs=[x, packed, scales, biases], template=[("K", Kd), ("N", N), ("WM", wm), ("WN", wn)],
                   grid=(-(-N // BN) * 32 * wm * wn, -(-M // BM), 1), threadgroup=(32 * wm * wn, 1, 1),
                   output_shapes=[(M, N)], output_dtypes=[x.dtype])[0]
 
@@ -714,3 +714,36 @@ def qlinear(x, packed, scales, biases):
     # ponytail: prefill-sized M is compute-bound and MLX's GEMM beats qmm (which re-unpacks W per M-tile);
     # unpacking once costs ~1% here. A qmm with larger tiles / W reuse across M-tiles is the upgrade path.
     return x @ dequantize4(packed, scales, biases).T
+
+
+# ---------------------------------------------------------------- bf16 GEMM for wide matrices at decode batch sizes
+# MLX's GEMM streams weights at ~135 GB/s up to 12 rows but only ~95-110 GB/s at 13-16 rows. On *wide* weights
+# (gate|up: 12288 rows, lm_head: 151936) the qmm tiling with a plain bf16 weight tile has enough threadgroups to
+# beat it; on narrow ones (o_proj: 16 threadgroups) it loses, so callers gate it by N.
+_BMM_SRC = _QMM_SRC[:_QMM_SRC.index("        for (uint i = tid; i < BN * BK / 8; i += nthreads) {           // weight tile")] + """
+        for (uint i = tid; i < BN * BK / 8; i += nthreads) {
+            uint r = i / (BK / 8), c = (i % (BK / 8)) * 8, n = n0 + r;
+            uint4 v = uint4(0);
+            if (n < N) v = *(const device uint4*)(w + n * K + k0 + c);
+            *(threadgroup uint4*)(&Ws[r][c]) = v;
+        }
+""" + _QMM_SRC[_QMM_SRC.index("        threadgroup_barrier(mem_flags::mem_threadgroup);\n        for (short kk = 0;"):]
+_bmm_k = mx.fast.metal_kernel(name="bmm_nax", header=_HDR_NAX, source=_BMM_SRC, input_names=["x", "w"],
+                              output_names=["out"])
+
+
+def bmm(x, w, wn=4):
+    """x [M <= 16, K] @ w[N, K]^T in bf16."""
+    M, Kd = x.shape
+    N = w.shape[0]
+    BN = 32 * wn
+    return _bmm_k(inputs=[x, w], template=[("K", Kd), ("N", N), ("WM", 1), ("WN", wn)],
+                  grid=(-(-N // BN) * 32 * wn, 1, 1), threadgroup=(32 * wn, 1, 1),
+                  output_shapes=[(M, N)], output_dtypes=[x.dtype])[0]
+
+
+def use_bmm(M, N):
+    """End-to-end A/B on Qwen3-1.7B decode steps (min of 3 interleaved trials): at 13-16 rows, gate|up and
+    lm_head through bmm cut the step 41.7 -> 38.6 ms; down/o/qkv through bmm are neutral-to-worse; at <= 12
+    rows MLX's GEMM is already at full bandwidth."""
+    return 13 <= M <= 16 and N >= 8192 and has_nax()

@@ -202,7 +202,11 @@ class MetalBackend(MLXBackend):
         return Q4(w)
 
     def linear(self, x, w):
-        return K.qlinear(x, w.packed, w.scales, w.biases) if isinstance(w, Q4) else x @ w.T
+        if isinstance(w, Q4):
+            return K.qlinear(x, w.packed, w.scales, w.biases)
+        if K.use_bmm(x.shape[0], w.shape[0]):
+            return K.bmm(x, w)
+        return x @ w.T
 
     def logits(self, h, w):
         return self.linear(h, w).astype(mx.float32)

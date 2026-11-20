@@ -211,6 +211,14 @@ def main():
                                                      prefix_caching=not a.no_prefix_caching, quant=a.quant,
                                                      draft=a.draft, spec_k=a.spec_k))
     eng = et.engine
+    print("warming up (JIT-compiles every kernel once)", flush=True)
+    warm = threading.Event()
+    et.submit(list(range(1000, 1700)), SamplingParams(max_tokens=8, ignore_eos=True),
+              lambda t, finish: finish and warm.set())
+    warm.wait()
+    eng.blocks.hit_tokens = eng.blocks.query_tokens = 0
+    if hasattr(eng, "drafted"):
+        eng.drafted = eng.accepted = 0
     cap = eng.blocks.num_blocks * eng.bs
     max_len = min(cap, eng.model.cfg.get("max_position_embeddings", cap))
     print(f"KV cache: {eng.blocks.num_blocks} blocks x {eng.bs} = {cap} tokens "

@@ -16,7 +16,7 @@ OURS="uv run python -m engine.server --model $MODEL --kv-gb 3.5 --max-seqs 16"
 
 start() {  # name port cmd...
   local name=$1 port=$2; shift 2
-  echo "=== $name: starting on :$port"
+  echo "=== $name: starting on :$port  [$(sysctl -n vm.swapusage)]"
   "$@" > "$OUT/$name.server.log" 2>&1 &
   PID=$!
   for _ in $(seq 1 600); do
@@ -28,6 +28,7 @@ start() {  # name port cmd...
 }
 
 stop() {
+  echo "=== stopping  [$(sysctl -n vm.swapusage)]"
   pkill -P $PID 2>/dev/null; kill $PID 2>/dev/null; wait $PID 2>/dev/null
   sleep 5   # let the GPU memory go back before the next engine
 }
@@ -51,7 +52,9 @@ run() {
                      -c 32768 -np 16 -kvu --kv-unified-per-slot 8192 --cache-ram 2048 && load llamacpp 8101 ;;
     mlxlm)         start mlxlm 8102 uv run mlx_lm.server --model $MODEL --host 127.0.0.1 --port 8102 \
                      --decode-concurrency 16 && load mlxlm 8102 ;;
-    vllm)          start vllm 8103 ~/.venv-vllm-metal/bin/vllm serve $MODEL --host 127.0.0.1 --port 8103 \
+    # KV commit probe off: it refuses the matched 3.76 GB budget when macOS compresses any memory; swap is
+    # logged around every engine instead, so paging during a run would show up in sweep.log
+    vllm)          start vllm 8103 env VLLM_METAL_KV_COMMIT_PROBE=0 ~/.venv-vllm-metal/bin/vllm serve $MODEL --host 127.0.0.1 --port 8103 \
                      --dtype bfloat16 --max-model-len 8192 --kv-cache-memory-bytes 3758096384 --max-num-seqs 16 \
                      && load vllm 8103 ;;
     *) echo "unknown config $1"; return 1 ;;
